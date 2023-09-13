@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 
-from .models import Profile,Post,Likepost
+from .models import Profile,Post,Likepost,FollowCount
 
 
 # Create your views here.
@@ -62,6 +62,25 @@ def upload(request):
         return redirect("/")
 
 @login_required(login_url="login")
+def follow(request):    
+    
+    if request.method == "POST":
+        follower = request.POST["follower"]
+        user = request.POST["user"]
+
+        if FollowCount.objects.filter(follower=follower,user=user).first():
+            delete_follower = FollowCount.objects.get(follower=follower,user=user)
+            delete_follower.delete()
+            return redirect("/profile/" + user)
+        else:
+            new_follow = FollowCount.objects.create(follower=follower,user=user)
+            new_follow.save()
+            return redirect("/profile/" + user)
+    else:
+        return redirect("/")
+
+
+@login_required(login_url="login")
 def like_post(request):
     username = request.user.username
     post_id = request.GET.get("post_id")
@@ -82,7 +101,37 @@ def like_post(request):
         post.save()
         return redirect("/")
 
+@login_required(login_url="login")
+def profile(request, pk):
+    user_object = User.objects.get(username=pk)
+    user_profile = Profile.objects.get(user=user_object)
 
+    user_posts = Post.objects.filter(user=pk)
+    user_posts_length = len(user_posts)
+
+    follower = request.user.username
+    user = pk
+    
+    using_follower = len(FollowCount.objects.filter(user=pk))
+    using_following = len(FollowCount.objects.filter(follower=pk))
+
+    if FollowCount.objects.filter(follower=follower,user=user).first():
+        button_text ="Unfollow"
+    else:
+        button_text = "Follow"
+
+    
+    context ={
+        "user_object":user_object,
+        "user_profile":user_profile,
+        "user_posts":user_posts,
+        "posts_length":user_posts_length,
+        "button_text":button_text,
+        "using_follower":using_follower,
+        "using_following":using_following
+    }
+
+    return render(request, "profile.html", context)
 
 def signup(request):
     if request.method == "POST":
